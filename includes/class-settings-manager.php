@@ -275,6 +275,10 @@ class Settings_Manager {
      * @return string Decrypted key
      */
     public function decrypt_api_key(string $encrypted_key): string {
+        if (empty($encrypted_key)) {
+            return '';
+        }
+        
         if (function_exists('openssl_decrypt') && defined('AUTH_SALT')) {
             $data = base64_decode($encrypted_key, true);
             if ($data === false) {
@@ -287,7 +291,8 @@ class Settings_Manager {
             }
             
             $method = 'AES-256-CBC';
-            return openssl_decrypt($parts[0], $method, AUTH_SALT, 0, $parts[1]);
+            $decrypted = openssl_decrypt($parts[0], $method, AUTH_SALT, 0, $parts[1]);
+            return $decrypted !== false ? $decrypted : '';
         }
         
         // Fallback to base64 decoding

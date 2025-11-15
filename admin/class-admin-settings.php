@@ -24,14 +24,21 @@ class Admin_Settings {
     private API_Client $api_client;
     
     public function __construct() {
-        $this->settings_manager = new Settings_Manager();
-        $this->api_client = new API_Client();
-        
-        add_action('admin_menu', [$this, 'add_admin_menu']);
-        add_action('admin_init', [$this, 'handle_form_submission']);
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
-        add_action('admin_post_guest_posts_generate_api_key', [$this, 'handle_generate_api_key']);
-        add_action('wp_ajax_guest_posts_get_keywords', [$this, 'handle_get_keywords_ajax']);
+        try {
+            $this->settings_manager = new Settings_Manager();
+            $this->api_client = new API_Client();
+            
+            add_action('admin_menu', [$this, 'add_admin_menu']);
+            add_action('admin_init', [$this, 'handle_form_submission']);
+            add_action('admin_enqueue_scripts', [$this, 'enqueue_scripts']);
+            add_action('admin_post_guest_posts_generate_api_key', [$this, 'handle_generate_api_key']);
+            add_action('wp_ajax_guest_posts_get_keywords', [$this, 'handle_get_keywords_ajax']);
+        } catch (Throwable $e) {
+            // Log error but don't break site
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts Admin Settings Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
+        }
     }
     
     /**
@@ -40,9 +47,14 @@ class Admin_Settings {
      * @return void
      */
     public function add_admin_menu(): void {
+        // Ensure user has permission
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        
         add_options_page(
-            __('Guest Posts Settings', 'guest-posts'),
-            __('Guest Posts', 'guest-posts'),
+            'Guest Posts Settings',
+            'Guest Posts',
             'manage_options',
             'guest-posts',
             [$this, 'render_settings_page']
@@ -55,7 +67,13 @@ class Admin_Settings {
      * @return void
      */
     public function handle_form_submission(): void {
-        if (!isset($_POST['guest_posts_action']) || !check_admin_referer('guest_posts_settings', 'guest_posts_nonce')) {
+        if (!isset($_POST['guest_posts_action'])) {
+            return;
+        }
+        
+        // Verify nonce
+        if (!isset($_POST['guest_posts_nonce']) || !wp_verify_nonce($_POST['guest_posts_nonce'], 'guest_posts_settings')) {
+            add_settings_error('guest_posts', 'nonce_error', __('Security check failed. Please try again.', 'guest-posts'));
             return;
         }
         
@@ -83,6 +101,9 @@ class Admin_Settings {
                 break;
             case 'test_connection':
                 $this->handle_test_connection();
+                break;
+            case 'bulk_import':
+                $this->handle_bulk_import();
                 break;
         }
     }
@@ -215,6 +236,91 @@ class Admin_Settings {
     }
     
     /**
+     * Handle bulk import
+     *
+     * @return void
+     */
+    private function handle_bulk_import(): void {
+        // Debug: Log that we got here
+        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+            error_log('Guest Posts: Bulk import handler called. POST data: ' . print_r($_POST, true));
+        }
+        
+        $config_strings = isset($_POST['config_strings']) ? sanitize_textarea_field($_POST['config_strings']) : '';
+        
+        if (empty($config_strings)) {
+            add_settings_error('guest_posts', 'bulk_import_error', __('No configuration strings provided', 'guest-posts'));
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Bulk import - empty config strings');
+            }
+            return;
+        }
+        
+        $lines = array_filter(array_map('trim', explode("\n", $config_strings)));
+        $success_count = 0;
+        $error_count = 0;
+        
+        foreach ($lines as $line) {
+            if (empty($line)) {
+                continue;
+            }
+            
+            try {
+                // Decode base64 and parse JSON
+                $decoded = base64_decode($line, true);
+                if ($decoded === false) {
+                    $error_count++;
+                    continue;
+                }
+                
+                $config = json_decode($decoded, true);
+                if (!is_array($config) || empty($config['url']) || empty($config['api_key'])) {
+                    $error_count++;
+                    continue;
+                }
+                
+                // Add site
+                $url = esc_url_raw($config['url']);
+                $api_key = sanitize_text_field($config['api_key']);
+                $name = isset($config['site_name']) ? sanitize_text_field($config['site_name']) : '';
+                
+                // Check if site already exists
+                $existing_sites = $this->settings_manager->get_network_sites();
+                $exists = false;
+                foreach ($existing_sites as $site) {
+                    if (trailingslashit($site['url']) === trailingslashit($url)) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                
+                if (!$exists) {
+                    $site_id = $this->settings_manager->add_network_site($url, $api_key, $name);
+                    if ($site_id) {
+                        $success_count++;
+                    } else {
+                        $error_count++;
+                    }
+                } else {
+                    // Site already exists - skip but don't count as error
+                }
+            } catch (Exception $e) {
+                $error_count++;
+            }
+        }
+        
+        if ($success_count > 0) {
+            add_settings_error('guest_posts', 'bulk_import_success', sprintf(__('%d site(s) added successfully', 'guest-posts'), $success_count), 'success');
+        }
+        if ($error_count > 0) {
+            add_settings_error('guest_posts', 'bulk_import_error', sprintf(__('%d configuration string(s) failed to import', 'guest-posts'), $error_count));
+        }
+        if ($success_count === 0 && $error_count === 0) {
+            add_settings_error('guest_posts', 'bulk_import_error', __('No valid configuration strings found', 'guest-posts'));
+        }
+    }
+    
+    /**
      * Handle test connection
      *
      * @return void
@@ -319,11 +425,94 @@ class Admin_Settings {
      * @return void
      */
     public function render_settings_page(): void {
+        // Force error display
+        @ini_set('display_errors', '1');
+        error_reporting(E_ALL);
+        
+        // Log that we're entering this function
+        error_log('Guest Posts: render_settings_page() called');
+        
         if (!current_user_can('manage_options')) {
+            error_log('Guest Posts: User does not have manage_options capability');
             return;
         }
         
-        require_once GUEST_POSTS_PLUGIN_DIR . 'admin/views/settings-page.php';
+        try {
+            // Ensure constant is defined
+            if (!defined('GUEST_POSTS_PLUGIN_DIR')) {
+                error_log('Guest Posts: GUEST_POSTS_PLUGIN_DIR constant not defined');
+                wp_die(
+                    '<h1>Guest Posts Error</h1>' .
+                    '<p>Plugin directory constant not defined. Please deactivate and reactivate the plugin.</p>' .
+                    '<p><strong>Error log:</strong> <code>' . esc_html(ABSPATH . 'wp-content/debug.log') . '</code></p>',
+                    'Guest Posts Error',
+                    ['response' => 500]
+                );
+                return;
+            }
+            
+            error_log('Guest Posts: GUEST_POSTS_PLUGIN_DIR = ' . GUEST_POSTS_PLUGIN_DIR);
+            
+            $view_file = GUEST_POSTS_PLUGIN_DIR . 'admin/views/settings-page.php';
+            error_log('Guest Posts: Looking for view file: ' . $view_file);
+            error_log('Guest Posts: File exists: ' . (file_exists($view_file) ? 'YES' : 'NO'));
+            
+            if (!file_exists($view_file)) {
+                error_log('Guest Posts: View file not found');
+                wp_die(
+                    '<h1>Guest Posts Error</h1>' .
+                    '<p>Settings page view file not found. Please reinstall the plugin.</p>' .
+                    '<p><strong>Error log:</strong> <code>' . esc_html(ABSPATH . 'wp-content/debug.log') . '</code></p>',
+                    'Guest Posts Error',
+                    ['response' => 500]
+                );
+                return;
+            }
+            
+            error_log('Guest Posts: About to require view file');
+            
+            // Use output buffering to catch any fatal errors
+            ob_start();
+            require_once $view_file;
+            $output = ob_get_clean();
+            
+            if ($output === false) {
+                error_log('Guest Posts: Output buffering failed');
+                wp_die(
+                    '<h1>Guest Posts Error</h1>' .
+                    '<p>Failed to render settings page. Check the error log for details.</p>' .
+                    '<p><strong>Error log:</strong> <code>' . esc_html(ABSPATH . 'wp-content/debug.log') . '</code></p>',
+                    'Guest Posts Error',
+                    ['response' => 500]
+                );
+                return;
+            }
+            
+            error_log('Guest Posts: View file loaded successfully, output length: ' . strlen($output));
+            echo $output;
+            
+        } catch (Throwable $e) {
+            // Catch any exceptions or errors - show them on screen
+            ob_end_clean();
+            
+            $trace = $e->getTraceAsString();
+            // Limit trace to first 10 lines to avoid overwhelming output
+            $trace_lines = explode("\n", $trace);
+            $trace = implode("\n", array_slice($trace_lines, 0, 10));
+            
+            wp_die(
+                '<h1>Guest Posts Error</h1>' .
+                '<p><strong>ERROR MESSAGE:</strong></p>' .
+                '<p style="background: #ffebee; padding: 15px; border-left: 4px solid #c62828; font-family: monospace; font-size: 14px;">' . esc_html($e->getMessage()) . '</p>' .
+                '<p><strong>FILE:</strong> ' . esc_html($e->getFile()) . '</p>' .
+                '<p><strong>LINE:</strong> ' . esc_html($e->getLine()) . '</p>' .
+                '<p><strong>TRACE (first 10 lines):</strong></p>' .
+                '<pre style="background: #f5f5f5; padding: 15px; overflow: auto; max-height: 300px;">' . esc_html($trace) . '</pre>' .
+                '<p><em>Copy the error message above and send it to support.</em></p>',
+                'Guest Posts Error',
+                ['response' => 500]
+            );
+        }
     }
 }
 

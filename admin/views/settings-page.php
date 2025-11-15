@@ -90,8 +90,8 @@ function guest_posts_decrypt_for_export($encrypted_key, $settings_manager) {
 }
 ?>
 
-<div class="wrap">
-    <h1>
+<div class="wrap guest-posts-wrap">
+    <h1 style="margin-top: 0; padding-top: 20px;">
         <?php echo esc_html(get_admin_page_title()); ?>
         <span style="font-size: 0.6em; font-weight: normal; color: #666; margin-left: 10px;">
             Version <?php echo esc_html(defined('GUEST_POSTS_VERSION') ? GUEST_POSTS_VERSION : 'unknown'); ?>
@@ -100,7 +100,7 @@ function guest_posts_decrypt_for_export($encrypted_key, $settings_manager) {
     
     <?php settings_errors('guest_posts'); ?>
     
-    <div class="guest-posts-settings">
+    <div class="guest-posts-settings" style="margin-top: 20px;">
         <!-- STEP 1: Get This Site's Config -->
         <div class="card" style="border-left: 4px solid #00a32a;">
             <h2>STEP 1: Get This Site's Config String</h2>
@@ -428,8 +428,8 @@ jQuery(document).ready(function($) {
         if ($('#api-key-display').length) {
             $('#api-key-display').select();
             document.execCommand('copy');
-            $(this).text('<?php esc_js_e('Copied!', 'guest-posts'); ?>');
-            setTimeout(() => $(this).text('<?php esc_js_e('Copy', 'guest-posts'); ?>'), 2000);
+            $(this).text('<?php echo esc_js(__('Copied!', 'guest-posts')); ?>');
+            setTimeout(() => $(this).text('<?php echo esc_js(__('Copy', 'guest-posts')); ?>'), 2000);
         }
     });
     
@@ -437,8 +437,8 @@ jQuery(document).ready(function($) {
     $('#copy-all-configs').on('click', function() {
         $('#export-all-sites').select();
         document.execCommand('copy');
-        $(this).text('<?php esc_js_e('Copied!', 'guest-posts'); ?>');
-        setTimeout(() => $(this).text('<?php esc_js_e('Copy All Configs', 'guest-posts'); ?>'), 2000);
+        $(this).text('<?php echo esc_js(__('Copied!', 'guest-posts')); ?>');
+        setTimeout(() => $(this).text('<?php echo esc_js(__('Copy All Configs', 'guest-posts')); ?>'), 2000);
     });
     
     // Import configuration - bulk or single
@@ -489,7 +489,7 @@ jQuery(document).ready(function($) {
     $('#import-single-btn').on('click', function() {
         var configString = $('#import-config').val().trim();
         if (!configString) {
-            alert('<?php esc_js_e('Please paste a configuration string.', 'guest-posts'); ?>');
+            alert('<?php echo esc_js(__('Please paste a configuration string.', 'guest-posts')); ?>');
             return;
         }
         
@@ -498,7 +498,7 @@ jQuery(document).ready(function($) {
         if (importConfig(firstLine, false)) {
             $('#import-status').text('✓ Imported - review and click "Add Site"').css('color', 'green');
         } else {
-            alert('<?php esc_js_e('Invalid configuration string format.', 'guest-posts'); ?>');
+            alert('<?php echo esc_js(__('Invalid configuration string format.', 'guest-posts')); ?>');
         }
     });
     

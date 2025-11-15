@@ -3,7 +3,7 @@
  * Plugin Name: Guest Posts
  * Plugin URI: https://talkingheads.com/guest-posts
  * Description: Automatically cross-post blog articles across WordPress sites with keyword filtering
- * Version: 0.3.2
+ * Version: 0.3.6
  * Author: Talking Heads
  * Author URI: https://talkingheads.com/
  * License: GPL v2 or later
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants
 if (!defined('GUEST_POSTS_VERSION')) {
-    define('GUEST_POSTS_VERSION', '0.3.2');
+    define('GUEST_POSTS_VERSION', '0.3.6');
 }
 if (!defined('GUEST_POSTS_PLUGIN_DIR')) {
     define('GUEST_POSTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -104,11 +104,39 @@ function guest_posts_init(): void {
         }
     } catch (Throwable $e) {
         // Log error but don't break site
-        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
-            error_log('Guest Posts Plugin Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            if (function_exists('error_log')) {
+                error_log('Guest Posts Plugin Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
         }
     }
 }
+
+// Register shutdown handler to catch fatal errors
+function guest_posts_shutdown_handler(): void {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_RECOVERABLE_ERROR], true)) {
+        // Check if error is related to our plugin
+        if (isset($error['file']) && strpos($error['file'], 'guest-posts') !== false) {
+            $error_message = sprintf(
+                'Guest Posts Fatal Error: %s in %s on line %d',
+                $error['message'],
+                $error['file'],
+                $error['line']
+            );
+            
+            // Try multiple logging methods
+            if (function_exists('error_log')) {
+                error_log($error_message);
+            }
+            
+            // Try to write directly to a log file we can control
+            $log_file = WP_CONTENT_DIR . '/guest-posts-error.log';
+            @file_put_contents($log_file, '[' . date('Y-m-d H:i:s') . '] ' . $error_message . PHP_EOL, FILE_APPEND);
+        }
+    }
+}
+register_shutdown_function('guest_posts_shutdown_handler');
 
 if (function_exists('add_action')) {
     add_action('plugins_loaded', 'guest_posts_init');

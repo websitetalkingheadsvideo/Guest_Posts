@@ -46,18 +46,35 @@ class Network_Manager {
      * @return void
      */
     public function on_post_published(int $post_id, \WP_Post $post): void {
-        // Skip revisions and autosaves
-        if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
-            return;
+        try {
+            // Skip revisions and autosaves
+            if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+                return;
+            }
+            
+            // Check if already sent
+            $already_sent = get_post_meta($post_id, '_guest_posts_sent', true);
+            if ($already_sent) {
+                return;
+            }
+            
+            $this->send_to_network($post_id);
+        } catch (Throwable $e) {
+            // Log error but don't break site - use multiple methods to ensure it's logged
+            $error_message = 'Guest Posts: Error in on_post_published - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine();
+            
+            // Try WordPress debug log
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                if (function_exists('error_log')) {
+                    error_log($error_message);
+                }
+                // Also try writing directly to debug.log if it exists
+                $debug_log = WP_CONTENT_DIR . '/debug.log';
+                if (is_writable(WP_CONTENT_DIR) || (file_exists($debug_log) && is_writable($debug_log))) {
+                    @file_put_contents($debug_log, '[' . current_time('mysql') . '] ' . $error_message . PHP_EOL, FILE_APPEND);
+                }
+            }
         }
-        
-        // Check if already sent
-        $already_sent = get_post_meta($post_id, '_guest_posts_sent', true);
-        if ($already_sent) {
-            return;
-        }
-        
-        $this->send_to_network($post_id);
     }
     
     /**
@@ -69,23 +86,30 @@ class Network_Manager {
      * @return void
      */
     public function on_post_status_transition(string $new_status, string $old_status, \WP_Post $post): void {
-        // Only send when transitioning to publish
-        if ($new_status !== 'publish' || $old_status === 'publish') {
-            return;
+        try {
+            // Only send when transitioning to publish
+            if ($new_status !== 'publish' || $old_status === 'publish') {
+                return;
+            }
+            
+            // Skip revisions and autosaves
+            if (wp_is_post_revision($post->ID) || wp_is_post_autosave($post->ID)) {
+                return;
+            }
+            
+            // Check if already sent
+            $already_sent = get_post_meta($post->ID, '_guest_posts_sent', true);
+            if ($already_sent) {
+                return;
+            }
+            
+            $this->send_to_network($post->ID);
+        } catch (Throwable $e) {
+            // Log error but don't break site
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in on_post_status_transition - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
         }
-        
-        // Skip revisions and autosaves
-        if (wp_is_post_revision($post->ID) || wp_is_post_autosave($post->ID)) {
-            return;
-        }
-        
-        // Check if already sent
-        $already_sent = get_post_meta($post->ID, '_guest_posts_sent', true);
-        if ($already_sent) {
-            return;
-        }
-        
-        $this->send_to_network($post->ID);
     }
     
     /**
@@ -97,23 +121,30 @@ class Network_Manager {
      * @return void
      */
     public function on_post_updated(int $post_id, \WP_Post $post_after, \WP_Post $post_before): void {
-        // Only update if post is published
-        if ($post_after->post_status !== 'publish') {
-            return;
+        try {
+            // Only update if post is published
+            if ($post_after->post_status !== 'publish') {
+                return;
+            }
+            
+            // Skip revisions and autosaves
+            if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+                return;
+            }
+            
+            // Only update if content actually changed
+            if ($post_after->post_content === $post_before->post_content &&
+                $post_after->post_title === $post_before->post_title) {
+                return;
+            }
+            
+            $this->update_network_posts($post_id);
+        } catch (Throwable $e) {
+            // Log error but don't break site
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in on_post_updated - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
         }
-        
-        // Skip revisions and autosaves
-        if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
-            return;
-        }
-        
-        // Only update if content actually changed
-        if ($post_after->post_content === $post_before->post_content &&
-            $post_after->post_title === $post_before->post_title) {
-            return;
-        }
-        
-        $this->update_network_posts($post_id);
     }
     
     /**
@@ -123,45 +154,81 @@ class Network_Manager {
      * @return void
      */
     public function send_to_network(int $post_id): void {
-        $post = get_post($post_id);
-        if (!$post) {
-            return;
-        }
-        
-        // Check exclusions
-        if ($this->is_excluded($post_id)) {
-            return;
-        }
-        
-        // Prepare post data
-        $post_data = $this->prepare_post_data($post_id);
-        
-        // Get network sites
-        $sites = $this->settings_manager->get_network_sites();
-        
-        $sent_sites = [];
-        
-        foreach ($sites as $site) {
-            $site_obj = $this->settings_manager->get_network_site($site['id']);
-            if (!$site_obj) {
-                continue;
-            }
-            $api_key = $site_obj['api_key'];
-            if (empty($api_key)) {
-                continue;
+        try {
+            $post = get_post($post_id);
+            if (!$post) {
+                return;
             }
             
-            $response = $this->api_client->send_post($site_obj['url'], $api_key, $post_data);
-            
-            if ($response['success']) {
-                $sent_sites[] = $site['id'];
+            // Check exclusions
+            if ($this->is_excluded($post_id)) {
+                return;
             }
-        }
-        
-        // Mark as sent
-        if (!empty($sent_sites)) {
-            update_post_meta($post_id, '_guest_posts_sent', true);
-            update_post_meta($post_id, '_guest_posts_sent_sites', $sent_sites);
+            
+            // Prepare post data
+            $post_data = $this->prepare_post_data($post_id);
+            if (empty($post_data)) {
+                return;
+            }
+            
+            // Get network sites
+            $sites = $this->settings_manager->get_network_sites();
+            if (empty($sites)) {
+                return;
+            }
+            
+            $sent_sites = [];
+            
+            foreach ($sites as $site) {
+                try {
+                    if (!isset($site['id'])) {
+                        continue;
+                    }
+                    
+                    $site_obj = $this->settings_manager->get_network_site($site['id']);
+                    if (!$site_obj || !isset($site_obj['url']) || !isset($site_obj['api_key'])) {
+                        continue;
+                    }
+                    
+                    $api_key = $site_obj['api_key'];
+                    if (empty($api_key)) {
+                        continue;
+                    }
+                    
+                    $response = $this->api_client->send_post($site_obj['url'], $api_key, $post_data);
+                    
+                    if (isset($response['success']) && $response['success']) {
+                        $sent_sites[] = $site['id'];
+                    }
+                } catch (Throwable $e) {
+                    // Log error for this site but continue with others
+                    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                        error_log('Guest Posts: Error sending to site ' . ($site['id'] ?? 'unknown') . ' - ' . $e->getMessage());
+                    }
+                    continue;
+                }
+            }
+            
+            // Mark as sent
+            if (!empty($sent_sites)) {
+                update_post_meta($post_id, '_guest_posts_sent', true);
+                update_post_meta($post_id, '_guest_posts_sent_sites', $sent_sites);
+            }
+        } catch (Throwable $e) {
+            // Log error but don't break site - use multiple methods to ensure it's logged
+            $error_message = 'Guest Posts: Error in send_to_network - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine();
+            
+            // Try WordPress debug log
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                if (function_exists('error_log')) {
+                    error_log($error_message);
+                }
+                // Also try writing directly to debug.log if it exists or can be created
+                $debug_log = WP_CONTENT_DIR . '/debug.log';
+                if (is_writable(WP_CONTENT_DIR) || (file_exists($debug_log) && is_writable($debug_log))) {
+                    @file_put_contents($debug_log, '[' . current_time('mysql') . '] ' . $error_message . PHP_EOL, FILE_APPEND);
+                }
+            }
         }
     }
     
@@ -172,40 +239,60 @@ class Network_Manager {
      * @return void
      */
     private function update_network_posts(int $post_id): void {
-        $post = get_post($post_id);
-        if (!$post) {
-            return;
-        }
-        
-        // Get sites this was sent to
-        $sent_sites = get_post_meta($post_id, '_guest_posts_sent_sites', true);
-        if (empty($sent_sites) || !is_array($sent_sites)) {
-            return;
-        }
-        
-        // Prepare post data
-        $post_data = $this->prepare_post_data($post_id);
-        $post_data['update'] = true;
-        $post_data['original_post_id'] = $post_id;
-        
-        // Get network sites
-        $sites = $this->settings_manager->get_network_sites();
-        
-        foreach ($sites as $site) {
-            if (!in_array($site['id'], $sent_sites, true)) {
-                continue;
+        try {
+            $post = get_post($post_id);
+            if (!$post) {
+                return;
             }
             
-            $site_obj = $this->settings_manager->get_network_site($site['id']);
-            if (!$site_obj) {
-                continue;
-            }
-            $api_key = $site_obj['api_key'];
-            if (empty($api_key)) {
-                continue;
+            // Get sites this was sent to
+            $sent_sites = get_post_meta($post_id, '_guest_posts_sent_sites', true);
+            if (empty($sent_sites) || !is_array($sent_sites)) {
+                return;
             }
             
-            $this->api_client->send_post($site_obj['url'], $api_key, $post_data);
+            // Prepare post data
+            $post_data = $this->prepare_post_data($post_id);
+            if (empty($post_data)) {
+                return;
+            }
+            
+            $post_data['update'] = true;
+            $post_data['original_post_id'] = $post_id;
+            
+            // Get network sites
+            $sites = $this->settings_manager->get_network_sites();
+            
+            foreach ($sites as $site) {
+                try {
+                    if (!isset($site['id']) || !in_array($site['id'], $sent_sites, true)) {
+                        continue;
+                    }
+                    
+                    $site_obj = $this->settings_manager->get_network_site($site['id']);
+                    if (!$site_obj || !isset($site_obj['url']) || !isset($site_obj['api_key'])) {
+                        continue;
+                    }
+                    
+                    $api_key = $site_obj['api_key'];
+                    if (empty($api_key)) {
+                        continue;
+                    }
+                    
+                    $this->api_client->send_post($site_obj['url'], $api_key, $post_data);
+                } catch (Throwable $e) {
+                    // Log error for this site but continue with others
+                    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                        error_log('Guest Posts: Error updating site ' . ($site['id'] ?? 'unknown') . ' - ' . $e->getMessage());
+                    }
+                    continue;
+                }
+            }
+        } catch (Throwable $e) {
+            // Log error but don't break site
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in update_network_posts - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
         }
     }
     
@@ -216,43 +303,105 @@ class Network_Manager {
      * @return array<string, mixed> Post data
      */
     private function prepare_post_data(int $post_id): array {
-        $post = get_post($post_id);
-        if (!$post) {
+        try {
+            $post = get_post($post_id);
+            if (!$post) {
+                return [];
+            }
+            
+            // Get content (Elementor or standard)
+            $content = '';
+            try {
+                $content = $this->elementor_handler->get_post_content($post_id);
+            } catch (Throwable $e) {
+                // Fallback to standard content if Elementor handler fails
+                $content = $post->post_content ?? '';
+                if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                    error_log('Guest Posts: Elementor handler failed, using standard content - ' . $e->getMessage());
+                }
+            }
+            
+            // Generate excerpt
+            $excerpt = $this->generate_excerpt($content, $post->post_excerpt ?? '');
+            
+            // Get tags
+            $tags = [];
+            try {
+                $tags = wp_get_post_tags($post_id, ['fields' => 'names']);
+                if (!is_array($tags)) {
+                    $tags = [];
+                }
+            } catch (Throwable $e) {
+                $tags = [];
+            }
+            
+            // Get categories
+            $categories = [];
+            try {
+                $categories = wp_get_post_categories($post_id, ['fields' => 'names']);
+                if (!is_array($categories)) {
+                    $categories = [];
+                }
+            } catch (Throwable $e) {
+                $categories = [];
+            }
+            
+            // Get featured image
+            $featured_image_url = '';
+            try {
+                $thumbnail_id = get_post_thumbnail_id($post_id);
+                if ($thumbnail_id) {
+                    $featured_image_url = wp_get_attachment_image_url($thumbnail_id, 'full');
+                    if (!is_string($featured_image_url)) {
+                        $featured_image_url = '';
+                    }
+                }
+            } catch (Throwable $e) {
+                $featured_image_url = '';
+            }
+            
+            // Get permalink
+            $permalink = '';
+            try {
+                $permalink = get_permalink($post_id);
+                if (!is_string($permalink)) {
+                    $permalink = '';
+                }
+            } catch (Throwable $e) {
+                $permalink = '';
+            }
+            
+            // Get author
+            $author = '';
+            try {
+                $author = get_the_author_meta('display_name', $post->post_author ?? 0);
+                if (!is_string($author)) {
+                    $author = '';
+                }
+            } catch (Throwable $e) {
+                $author = '';
+            }
+            
+            return [
+                'title' => $post->post_title ?? '',
+                'content' => $content,
+                'excerpt' => $excerpt,
+                'permalink' => $permalink,
+                'post_id' => $post_id,
+                'site_url' => home_url(),
+                'tags' => $tags,
+                'categories' => $categories,
+                'featured_image_url' => $featured_image_url,
+                'author' => $author,
+                'date' => $post->post_date ?? '',
+            ];
+        } catch (Throwable $e) {
+            // Log error and return empty array
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in prepare_post_data - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
             return [];
         }
-        
-        // Get content (Elementor or standard)
-        $content = $this->elementor_handler->get_post_content($post_id);
-        
-        // Generate excerpt
-        $excerpt = $this->generate_excerpt($content, $post->post_excerpt);
-        
-        // Get tags
-        $tags = wp_get_post_tags($post_id, ['fields' => 'names']);
-        
-        // Get categories
-        $categories = wp_get_post_categories($post_id, ['fields' => 'names']);
-        
-        // Get featured image
-        $featured_image_url = '';
-        $thumbnail_id = get_post_thumbnail_id($post_id);
-        if ($thumbnail_id) {
-            $featured_image_url = wp_get_attachment_image_url($thumbnail_id, 'full');
-        }
-        
-        return [
-            'title' => $post->post_title,
-            'content' => $content,
-            'excerpt' => $excerpt,
-            'permalink' => get_permalink($post_id),
-            'post_id' => $post_id,
-            'site_url' => home_url(),
-            'tags' => $tags,
-            'categories' => $categories,
-            'featured_image_url' => $featured_image_url,
-            'author' => get_the_author_meta('display_name', $post->post_author),
-            'date' => $post->post_date,
-        ];
     }
     
     /**
@@ -279,25 +428,48 @@ class Network_Manager {
      * @return bool True if excluded
      */
     private function is_excluded(int $post_id): bool {
-        $exclusions = $this->settings_manager->get_exclusions();
-        
-        // Check categories
-        $post_categories = wp_get_post_categories($post_id);
-        foreach ($post_categories as $cat_id) {
-            if (in_array($cat_id, $exclusions['categories'], true)) {
-                return true;
+        try {
+            $exclusions = $this->settings_manager->get_exclusions();
+            if (!is_array($exclusions)) {
+                return false;
             }
-        }
-        
-        // Check tags
-        $post_tags = wp_get_post_tags($post_id, ['fields' => 'ids']);
-        foreach ($post_tags as $tag_id) {
-            if (in_array($tag_id, $exclusions['tags'], true)) {
-                return true;
+            
+            // Check categories
+            try {
+                $post_categories = wp_get_post_categories($post_id);
+                if (is_array($post_categories) && isset($exclusions['categories']) && is_array($exclusions['categories'])) {
+                    foreach ($post_categories as $cat_id) {
+                        if (in_array($cat_id, $exclusions['categories'], true)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                // Continue to check tags
             }
+            
+            // Check tags
+            try {
+                $post_tags = wp_get_post_tags($post_id, ['fields' => 'ids']);
+                if (is_array($post_tags) && isset($exclusions['tags']) && is_array($exclusions['tags'])) {
+                    foreach ($post_tags as $tag_id) {
+                        if (in_array($tag_id, $exclusions['tags'], true)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                // Continue
+            }
+            
+            return false;
+        } catch (Throwable $e) {
+            // If exclusion check fails, don't exclude the post
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in is_excluded - ' . $e->getMessage());
+            }
+            return false;
         }
-        
-        return false;
     }
     
     /**
@@ -347,24 +519,32 @@ class Network_Manager {
      * @return void
      */
     public function handle_manual_send(): void {
-        check_ajax_referer('guest_posts_manual_send', 'nonce');
-        
-        if (!current_user_can('publish_posts')) {
-            wp_send_json_error(['message' => __('Insufficient permissions', 'guest-posts')]);
+        try {
+            check_ajax_referer('guest_posts_manual_send', 'nonce');
+            
+            if (!current_user_can('publish_posts')) {
+                wp_send_json_error(['message' => __('Insufficient permissions', 'guest-posts')]);
+            }
+            
+            $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+            if (!$post_id) {
+                wp_send_json_error(['message' => __('Invalid post ID', 'guest-posts')]);
+            }
+            
+            // Clear sent flag to allow resending
+            delete_post_meta($post_id, '_guest_posts_sent');
+            delete_post_meta($post_id, '_guest_posts_sent_sites');
+            
+            $this->send_to_network($post_id);
+            
+            wp_send_json_success(['message' => __('Post sent to network', 'guest-posts')]);
+        } catch (Throwable $e) {
+            // Log error and send error response
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
+                error_log('Guest Posts: Error in handle_manual_send - ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            }
+            wp_send_json_error(['message' => __('Error sending post: ', 'guest-posts') . $e->getMessage()]);
         }
-        
-        $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
-        if (!$post_id) {
-            wp_send_json_error(['message' => __('Invalid post ID', 'guest-posts')]);
-        }
-        
-        // Clear sent flag to allow resending
-        delete_post_meta($post_id, '_guest_posts_sent');
-        delete_post_meta($post_id, '_guest_posts_sent_sites');
-        
-        $this->send_to_network($post_id);
-        
-        wp_send_json_success(['message' => __('Post sent to network', 'guest-posts')]);
     }
 }
 

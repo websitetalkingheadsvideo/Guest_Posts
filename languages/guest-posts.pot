@@ -1,0 +1,125 @@
+# Copyright (C) 2024 Guest Posts
+# This file is distributed under the same license as the Guest Posts plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Guest Posts 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/guest-posts\n"
+"POT-Creation-Date: 2024-01-01 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+msgid "Guest Posts"
+msgstr ""
+
+msgid "Guest Posts Settings"
+msgstr ""
+
+msgid "Your Site API Key"
+msgstr ""
+
+msgid "Share this API key with other sites to allow them to send posts to this site."
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Generate API Key"
+msgstr ""
+
+msgid "Network Sites"
+msgstr ""
+
+msgid "Add WordPress sites to your network. Posts will be sent to all sites when published."
+msgstr ""
+
+msgid "Site Name"
+msgstr ""
+
+msgid "e.g., Main Blog"
+msgstr ""
+
+msgid "Site URL"
+msgstr ""
+
+msgid "API Key"
+msgstr ""
+
+msgid "Paste API key from remote site"
+msgstr ""
+
+msgid "Add Site"
+msgstr ""
+
+msgid "Connected Sites"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "URL"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Keywords"
+msgstr ""
+
+msgid "Test"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Exclusions"
+msgstr ""
+
+msgid "Posts in these categories or tags will not be sent to the network."
+msgstr ""
+
+msgid "Exclude Categories"
+msgstr ""
+
+msgid "Hold Ctrl/Cmd to select multiple categories."
+msgstr ""
+
+msgid "Exclude Tags"
+msgstr ""
+
+msgid "Hold Ctrl/Cmd to select multiple tags."
+msgstr ""
+
+msgid "Save Exclusions"
+msgstr ""
+
+msgid "Manage Keywords"
+msgstr ""
+
+msgid "Enter keywords (one per line or comma-separated). Posts matching any keyword will be cross-posted to this site."
+msgstr ""
+
+msgid "whiteboard videos, video marketing, animation"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Save Keywords"
+msgstr ""
+
+msgid "Send to Network"
+msgstr ""
+
+msgid "This post has been sent to the network."
+msgstr ""
+
+msgid "Read more"
+msgstr ""
+

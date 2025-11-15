@@ -1,0 +1,42 @@
+# WordPress
+wp-config.php
+.htaccess
+
+# Dependencies
+node_modules/
+vendor/
+composer.lock
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build
+*.zip
+dist/
+build/
+
+# Logs
+*.log
+error_log
+debug.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Environment
+.env
+.env.local

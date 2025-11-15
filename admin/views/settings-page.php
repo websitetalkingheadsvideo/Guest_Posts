@@ -113,19 +113,20 @@ function guest_posts_decrypt_for_export($encrypted_key, $settings_manager) {
                         <?php esc_html_e('Generate API Key First', 'guest-posts'); ?>
                     </a>
                 </p>
-            <?php else: ?>
-                <p>
-                    <button type="button" class="button button-primary button-large" id="share-config">
-                        <?php esc_html_e('Click Here to Get Config String', 'guest-posts'); ?>
-                    </button>
-                </p>
-                <!-- Hidden input with API key for JavaScript -->
-                <input type="hidden" id="api-key-display" value="<?php echo esc_attr($api_key); ?>">
-                <div id="share-config-output" style="display:none; background: #fff; border: 2px solid #00a32a; padding: 15px; border-radius: 4px; margin-top: 15px;">
+            <?php else: 
+                // Generate config string directly in PHP
+                $config = [
+                    'url' => home_url(),
+                    'api_key' => $api_key,
+                    'site_name' => get_bloginfo('name')
+                ];
+                $config_string = base64_encode(json_encode($config, JSON_UNESCAPED_SLASHES));
+                ?>
+                <div style="background: #fff; border: 2px solid #00a32a; padding: 15px; border-radius: 4px; margin-top: 15px;">
                     <p style="font-weight: bold; margin-top: 0;">
                         <?php esc_html_e('COPY THIS ENTIRE STRING:', 'guest-posts'); ?>
                     </p>
-                    <textarea id="config-string" readonly class="large-text code" rows="3" onclick="this.select();" style="width:100%; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc;"></textarea>
+                    <textarea readonly class="large-text code" rows="3" onclick="this.select();" style="width:100%; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc;"><?php echo esc_textarea($config_string); ?></textarea>
                     <p style="margin-bottom: 0; color: #d63638; font-weight: bold;">
                         <?php esc_html_e('✓ Copy this string. You\'ll paste it into all your other sites in Step 2.', 'guest-posts'); ?>
                     </p>
@@ -158,13 +159,15 @@ function guest_posts_decrypt_for_export($encrypted_key, $settings_manager) {
                     <?php esc_html_e('4. Copy the string that appears', 'guest-posts'); ?><br>
                     <?php esc_html_e('5. Paste it here (one per line if you have multiple)', 'guest-posts'); ?>
                 </p>
-                <textarea id="import-config" placeholder="<?php esc_attr_e('Paste config strings here, one per line...', 'guest-posts'); ?>" rows="8" class="large-text" style="width:100%; margin-bottom: 10px; font-family: monospace; font-size: 12px; padding: 10px;"></textarea>
-                <div style="margin-bottom: 10px;">
-                    <button type="button" class="button button-primary button-large" id="import-config-btn" style="font-size: 16px; padding: 8px 20px;">
-                        <?php esc_html_e('Add All These Sites', 'guest-posts'); ?>
-                    </button>
-                    <span id="import-status" style="margin-left: 15px; font-weight: bold; font-size: 14px;"></span>
-                </div>
+                <form method="post" action="" class="guest-posts-form" id="bulk-import-form">
+                    <?php wp_nonce_field('guest_posts_settings', 'guest_posts_nonce'); ?>
+                    <input type="hidden" name="guest_posts_action" value="bulk_import">
+                    <textarea name="config_strings" id="import-config" placeholder="<?php esc_attr_e('Paste config strings here, one per line...', 'guest-posts'); ?>" rows="8" class="large-text" style="width:100%; margin-bottom: 10px; font-family: monospace; font-size: 12px; padding: 10px;"><?php echo isset($_POST['config_strings']) ? esc_textarea($_POST['config_strings']) : ''; ?></textarea>
+                    <p class="submit">
+                        <input type="submit" class="button button-primary" id="import-config-btn" value="<?php esc_attr_e('Add Sites', 'guest-posts'); ?>">
+                        <span id="import-status" style="margin-left: 15px; font-weight: bold; font-size: 14px;"></span>
+                    </p>
+                </form>
             </div>
             
             <!-- Add New Site Form -->
@@ -418,6 +421,8 @@ function guest_posts_decrypt_for_export($encrypted_key, $settings_manager) {
 
 <script>
 jQuery(document).ready(function($) {
+    console.log('Guest Posts inline script loaded');
+    
     // Copy API key (if element exists)
     $('#copy-api-key').on('click', function() {
         if ($('#api-key-display').length) {
@@ -436,21 +441,6 @@ jQuery(document).ready(function($) {
         setTimeout(() => $(this).text('<?php esc_js_e('Copy All Configs', 'guest-posts'); ?>'), 2000);
     });
     
-    // Share configuration
-    $('#share-config').on('click', function() {
-        var siteUrl = '<?php echo esc_js(home_url()); ?>';
-        var apiKey = $('#api-key-display').val();
-        var config = {
-            url: siteUrl,
-            api_key: apiKey,
-            site_name: '<?php echo esc_js(get_bloginfo('name')); ?>'
-        };
-        var configString = btoa(JSON.stringify(config));
-        $('#config-string').val(configString);
-        $('#share-config-output').slideDown();
-        $('#config-string').select();
-    });
-    
     // Import configuration - bulk or single
     function importConfig(configString, autoSubmit) {
         try {
@@ -459,7 +449,8 @@ jQuery(document).ready(function($) {
                 if (autoSubmit) {
                     // Bulk import - submit directly
                     var $form = $('<form method="post" style="display:none;">').appendTo('body');
-                    $form.append('<?php wp_nonce_field('guest_posts_settings', 'guest_posts_nonce', false); ?>');
+                    var nonce = '<?php echo wp_create_nonce('guest_posts_settings'); ?>';
+                    $form.append($('<input>').attr({type: 'hidden', name: 'guest_posts_nonce', value: nonce}));
                     $form.append($('<input>').attr({type: 'hidden', name: 'guest_posts_action', value: 'add_site'}));
                     $form.append($('<input>').attr({type: 'hidden', name: 'site_url', value: config.url}));
                     $form.append($('<input>').attr({type: 'hidden', name: 'api_key', value: config.api_key}));
@@ -509,69 +500,6 @@ jQuery(document).ready(function($) {
         } else {
             alert('<?php esc_js_e('Invalid configuration string format.', 'guest-posts'); ?>');
         }
-    });
-    
-    // Import all sites (bulk submit)
-    $('#import-config-btn').on('click', function() {
-        var configStrings = $('#import-config').val().trim();
-        if (!configStrings) {
-            alert('<?php esc_js_e('Please paste configuration string(s).', 'guest-posts'); ?>');
-            return;
-        }
-        
-        var lines = configStrings.split('\n').map(function(line) { return line.trim(); }).filter(function(line) { return line.length > 0; });
-        
-        if (lines.length === 0) {
-            alert('<?php esc_js_e('No valid configuration strings found.', 'guest-posts'); ?>');
-            return;
-        }
-        
-        // Validate all first
-        var validCount = 0;
-        for (var i = 0; i < lines.length; i++) {
-            try {
-                var config = JSON.parse(atob(lines[i]));
-                if (config.url && config.api_key) {
-                    validCount++;
-                }
-            } catch (e) {
-                // Invalid - skip
-            }
-        }
-        
-        if (validCount === 0) {
-            alert('<?php esc_js_e('No valid configuration strings found.', 'guest-posts'); ?>');
-            return;
-        }
-        
-        if (lines.length > 1) {
-            // Multiple sites - confirm first
-            if (!confirm('<?php esc_js_e('This will add ', 'guest-posts'); ?>' + validCount + '<?php esc_js_e(' site(s). Continue?', 'guest-posts'); ?>')) {
-                return;
-            }
-        }
-        
-        // Submit via existing form - more reliable
-        $('#import-status').text('<?php esc_js_e('Submitting...', 'guest-posts'); ?>').css('color', 'blue');
-        
-        // Use the existing form, just modify it
-        var $existingForm = $('.guest-posts-form').first();
-        if ($existingForm.length === 0) {
-            alert('<?php esc_js_e('Form not found. Please refresh the page.', 'guest-posts'); ?>');
-            return;
-        }
-        
-        // Create hidden inputs and append to existing form
-        $existingForm.find('input[name="guest_posts_action"]').val('bulk_import');
-        
-        // Remove old config_strings if exists
-        $existingForm.find('textarea[name="config_strings"]').remove();
-        
-        // Add config strings
-        $existingForm.append($('<textarea>').attr({name: 'config_strings', style: 'display:none;'}).text(configStrings));
-        
-        // Submit the existing form
-        $existingForm.submit();
     });
     
     // Keywords modal

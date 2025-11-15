@@ -376,6 +376,15 @@ class Admin_Settings {
         wp_localize_script('guest-posts-admin', 'guestPosts', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('guest_posts_manual_send'),
+            'siteUrl' => home_url(),
+            'siteName' => get_bloginfo('name'),
+            'strings' => [
+                'pasteConfig' => __('Please paste configuration string(s).', 'guest-posts'),
+                'noValidConfigs' => __('No valid configuration strings found.', 'guest-posts'),
+                'willAdd' => __('This will add ', 'guest-posts'),
+                'sitesContinue' => __(' site(s). Continue?', 'guest-posts'),
+                'submitting' => __('Submitting...', 'guest-posts'),
+            ],
         ]);
     }
     

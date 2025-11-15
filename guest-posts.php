@@ -3,7 +3,7 @@
  * Plugin Name: Guest Posts
  * Plugin URI: https://talkingheads.com/guest-posts
  * Description: Automatically cross-post blog articles across WordPress sites with keyword filtering
- * Version: 0.1.7
+ * Version: 0.3.2
  * Author: Talking Heads
  * Author URI: https://talkingheads.com/
  * License: GPL v2 or later
@@ -19,17 +19,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Force error display for this plugin (helps with debugging)
-if (!defined('WP_DEBUG')) {
-    @ini_set('display_errors', '1');
-}
-if (!defined('WP_DEBUG_DISPLAY')) {
-    @ini_set('display_errors', '1');
-}
-
 // Define plugin constants
 if (!defined('GUEST_POSTS_VERSION')) {
-    define('GUEST_POSTS_VERSION', '0.1.7');
+    define('GUEST_POSTS_VERSION', '0.3.2');
 }
 if (!defined('GUEST_POSTS_PLUGIN_DIR')) {
     define('GUEST_POSTS_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -42,50 +34,51 @@ if (!defined('GUEST_POSTS_PLUGIN_FILE')) {
 }
 
 // Autoloader
-spl_autoload_register(function (string $class): void {
-    $prefix = 'GuestPosts\\';
-    
-    $len = strlen($prefix);
-    if (strncmp($prefix, $class, $len) !== 0) {
-        return;
-    }
-    
-    $relative_class = substr($class, $len);
-    
-    // Get plugin directory (use constant if available, otherwise calculate)
-    $plugin_dir = defined('GUEST_POSTS_PLUGIN_DIR') 
-        ? GUEST_POSTS_PLUGIN_DIR 
-        : dirname(__FILE__) . DIRECTORY_SEPARATOR;
-    
-    // Handle Admin namespace
-    if (strpos($relative_class, 'Admin\\') === 0) {
-        $relative_class = substr($relative_class, 6); // Remove 'Admin\'
-        $base_dir = $plugin_dir . 'admin' . DIRECTORY_SEPARATOR;
-    } else {
-        $base_dir = $plugin_dir . 'includes' . DIRECTORY_SEPARATOR;
-    }
-    
-    // Convert class name to file name
-    // Admin_Settings -> admin-settings
-    $file_name = strtolower(str_replace('_', '-', $relative_class));
-    $file = $base_dir . 'class-' . $file_name . '.php';
-    
-    if (file_exists($file)) {
-        require_once $file;
-    }
-});
+if (function_exists('spl_autoload_register')) {
+    spl_autoload_register(function (string $class): void {
+        $prefix = 'GuestPosts\\';
+        
+        $len = strlen($prefix);
+        if (strncmp($prefix, $class, $len) !== 0) {
+            return;
+        }
+        
+        $relative_class = substr($class, $len);
+        
+        // Get plugin directory (use constant if available, otherwise calculate)
+        $plugin_dir = defined('GUEST_POSTS_PLUGIN_DIR') 
+            ? GUEST_POSTS_PLUGIN_DIR 
+            : dirname(__FILE__) . DIRECTORY_SEPARATOR;
+        
+        // Handle Admin namespace
+        if (strpos($relative_class, 'Admin\\') === 0) {
+            $relative_class = substr($relative_class, 6); // Remove 'Admin\'
+            $base_dir = $plugin_dir . 'admin' . DIRECTORY_SEPARATOR;
+        } else {
+            $base_dir = $plugin_dir . 'includes' . DIRECTORY_SEPARATOR;
+        }
+        
+        // Convert class name to file name
+        // Admin_Settings -> admin-settings
+        $file_name = strtolower(str_replace('_', '-', $relative_class));
+        $file = $base_dir . 'class-' . $file_name . '.php';
+        
+        if (file_exists($file)) {
+            require_once $file;
+        }
+    });
+}
 
 // Initialize admin class early
-if (is_admin()) {
+if (function_exists('is_admin') && is_admin()) {
     add_action('plugins_loaded', function (): void {
         try {
-            new GuestPosts\Admin\Admin_Settings();
+            if (class_exists('GuestPosts\Admin\Admin_Settings')) {
+                new GuestPosts\Admin\Admin_Settings();
+            }
         } catch (Throwable $e) {
-            // Show error on admin pages
-            add_action('admin_notices', function() use ($e) {
-                echo '<div class="notice notice-error"><p><strong>Guest Posts Error:</strong> ' . esc_html($e->getMessage()) . ' in ' . esc_html($e->getFile()) . ' on line ' . esc_html($e->getLine()) . '</p></div>';
-            });
-            if (defined('WP_DEBUG') && WP_DEBUG) {
+            // Log error but don't break site
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
                 error_log('Guest Posts Admin Init Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
             }
         }
@@ -94,29 +87,39 @@ if (is_admin()) {
 
 // Initialize plugin
 function guest_posts_init(): void {
+    if (!function_exists('load_plugin_textdomain')) {
+        return;
+    }
+    
     // Load text domain for translations
     load_plugin_textdomain('guest-posts', false, dirname(plugin_basename(__FILE__)) . '/languages');
     
     try {
         // Always initialize core classes
-        new GuestPosts\Network_Manager();
-        new GuestPosts\Post_Receiver();
+        if (class_exists('GuestPosts\Network_Manager')) {
+            new GuestPosts\Network_Manager();
+        }
+        if (class_exists('GuestPosts\Post_Receiver')) {
+            new GuestPosts\Post_Receiver();
+        }
     } catch (Throwable $e) {
         // Log error but don't break site
-        if (defined('WP_DEBUG') && WP_DEBUG) {
+        if (defined('WP_DEBUG') && WP_DEBUG && function_exists('error_log')) {
             error_log('Guest Posts Plugin Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
         }
     }
 }
-add_action('plugins_loaded', 'guest_posts_init');
+
+if (function_exists('add_action')) {
+    add_action('plugins_loaded', 'guest_posts_init');
+}
 
 // Activation hook
-register_activation_hook(__FILE__, 'guest_posts_activate');
+if (function_exists('register_activation_hook')) {
+    register_activation_hook(__FILE__, 'guest_posts_activate');
+}
 
 function guest_posts_activate(): void {
-    // Clean up any orphaned/incomplete installations
-    guest_posts_cleanup_old_installation();
-    
     // Use dirname(__FILE__) directly - more reliable than plugin_dir_path during activation
     $plugin_dir = dirname(__FILE__) . DIRECTORY_SEPARATOR;
     
@@ -133,11 +136,7 @@ function guest_posts_activate(): void {
             }
             
             if (!file_exists($settings_file)) {
-                // Don't prevent activation - just log the error
-                if (function_exists('error_log')) {
-                    error_log('Guest Posts Plugin: Settings Manager file not found at: ' . $settings_file);
-                }
-                // Continue anyway - the autoloader will handle it when needed
+                // Don't prevent activation - just return silently
                 return;
             }
         }
@@ -154,10 +153,7 @@ function guest_posts_activate(): void {
                 $settings_manager->generate_api_key();
             }
         } catch (Throwable $e) {
-            // Log error but don't prevent activation
-            if (function_exists('error_log')) {
-                error_log('Guest Posts Plugin Activation Error: ' . $e->getMessage());
-            }
+            // Silently fail - don't prevent activation
         }
     }
 }
@@ -204,7 +200,9 @@ function guest_posts_cleanup_old_installation(): void {
 }
 
 // Deactivation hook
-register_deactivation_hook(__FILE__, function (): void {
-    // Clean up scheduled events if any
-});
+if (function_exists('register_deactivation_hook')) {
+    register_deactivation_hook(__FILE__, function (): void {
+        // Clean up scheduled events if any
+    });
+}
 

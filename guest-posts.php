@@ -3,7 +3,7 @@
  * Plugin Name: Guest Posts
  * Plugin URI: https://talkingheads.com/guest-posts
  * Description: Automatically cross-post blog articles across WordPress sites with keyword filtering
- * Version: 0.3.6
+ * Version: 0.3.7
  * Author: Talking Heads
  * Author URI: https://talkingheads.com/
  * License: GPL v2 or later
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 
 // Define plugin constants
 if (!defined('GUEST_POSTS_VERSION')) {
-    define('GUEST_POSTS_VERSION', '0.3.6');
+    define('GUEST_POSTS_VERSION', '0.3.7');
 }
 if (!defined('GUEST_POSTS_PLUGIN_DIR')) {
     define('GUEST_POSTS_PLUGIN_DIR', plugin_dir_path(__FILE__));

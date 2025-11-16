@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Posts - Automatically Cross-Post Your Content Across WordPress Sites</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        .guest-posts-marketing {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .guest-posts-marketing h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .guest-posts-marketing h2 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 2rem 0 1rem;
+        }
+        
+        .guest-posts-marketing h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #34495e;
+            margin: 1.5rem 0 1rem;
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            margin-bottom: 60px;
+        }
+        
+        .hero h1 {
+            color: white;
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: #ff6b6b;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        .cta-button-secondary {
+            background: white;
+            color: #667eea;
+            margin-left: 15px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .feature-card h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .benefits {
+            background: #f0f4ff;
+            padding: 40px;
+            border-radius: 12px;
+            margin: 40px 0;
+        }
+        
+        .benefits ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .benefits li {
+            padding: 15px 0;
+            padding-left: 35px;
+            position: relative;
+            font-size: 1.1rem;
+        }
+        
+        .benefits li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #00a32a;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        
+        .how-it-works {
+            margin: 60px 0;
+        }
+        
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        .step {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            line-height: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .pricing {
+            background: #fff;
+            border: 2px solid #667eea;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .price {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        
+        .testimonials {
+            margin: 60px 0;
+        }
+        
+        .testimonial {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        .testimonial-text {
+            font-style: italic;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: #555;
+        }
+        
+        .testimonial-author {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .faq {
+            margin: 60px 0;
+        }
+        
+        .faq-item {
+            background: #f8f9fa;
+            padding: 25px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .faq-question {
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .faq-answer {
+            color: #555;
+            line-height: 1.8;
+        }
+        
+        .cta-section {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            border-radius: 12px;
+            margin: 60px 0;
+        }
+        
+        .cta-section h2 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .cta-section p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .guest-posts-marketing h1 {
+                font-size: 2rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .steps {
+                grid-template-columns: 1fr;
+            }
+            
+            .cta-button-secondary {
+                margin-left: 0;
+                margin-top: 15px;
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="guest-posts-marketing">
+        <!-- Hero Section -->
+        <div class="hero">
+            <h1>Guest Posts WordPress Plugin</h1>
+            <p>Automatically cross-post your blog articles across multiple WordPress sites with intelligent keyword filtering</p>
+            <a href="#features" class="cta-button">Learn More</a>
+            <a href="https://wordpress.org/plugins/guest-posts" class="cta-button cta-button-secondary" target="_blank">Download Now</a>
+        </div>
+
+        <!-- Features Grid -->
+        <section id="features">
+            <h2>Powerful Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Automatic Cross-Posting</h3>
+                    <p>Publish once, distribute everywhere. Your posts automatically sync across all your WordPress sites when published.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Smart Keyword Filtering</h3>
+                    <p>Each site can filter incoming posts by keywords. Only relevant content gets published on each network site.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure API Authentication</h3>
+                    <p>Enterprise-grade encryption for API keys ensures your network connections are always secure.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Elementor Support</h3>
+                    <p>Full compatibility with Elementor page builder. Your beautifully designed pages cross-post perfectly.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <h3>Bulk Import/Export</h3>
+                    <p>Quickly set up networks with bulk import of config strings. Export your entire network in seconds.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Real-Time Updates</h3>
+                    <p>When you update a post, changes automatically sync across all connected sites. Keep everything in sync.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Benefits Section -->
+        <section class="benefits">
+            <h2>Why Choose Guest Posts?</h2>
+            <ul>
+                <li>Save hours of manual work by automating cross-posting across multiple sites</li>
+                <li>Maintain brand consistency with synchronized content updates</li>
+                <li>Increase your content's reach without duplicating effort</li>
+                <li>Smart filtering ensures only relevant content appears on each site</li>
+                <li>Works seamlessly with existing WordPress workflows</li>
+                <li>Enterprise-grade security with encrypted API keys</li>
+                <li>No coding required - set up in minutes</li>
+                <li>Full Elementor compatibility for designers and developers</li>
+            </ul>
+        </section>
+
+        <!-- How It Works -->
+        <section class="how-it-works">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Generate API Key</h3>
+                    <p>Create a unique API key on each WordPress site in your network</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Connect Sites</h3>
+                    <p>Add network sites using simple config strings - bulk import supported</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Set Keywords</h3>
+                    <p>Optionally configure keywords for each site to filter relevant content</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Publish & Sync</h3>
+                    <p>Publish once, and your post automatically appears on matching sites</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing -->
+        <section class="pricing">
+            <h2>Simple, Affordable Pricing</h2>
+            <div class="price">Free</div>
+            <p style="font-size: 1.2rem; margin-bottom: 20px;">Open source and free forever</p>
+            <p>Guest Posts is completely free to use. No hidden fees, no subscriptions, no limitations.</p>
+            <a href="https://wordpress.org/plugins/guest-posts" class="cta-button" target="_blank" style="margin-top: 20px;">Get Started Free</a>
+        </section>
+
+        <!-- Testimonials -->
+        <section class="testimonials">
+            <h2>What Users Are Saying</h2>
+            <div class="testimonial">
+                <div class="testimonial-text">
+                    "Guest Posts has revolutionized how we manage content across our network of sites. What used to take hours now happens automatically."
+                </div>
+                <div class="testimonial-author">— Marketing Director, Multi-Site Network</div>
+            </div>
+            <div class="testimonial">
+                <div class="testimonial-text">
+                    "The keyword filtering is brilliant - each site only gets relevant content. Setup was incredibly easy with the bulk import feature."
+                </div>
+                <div class="testimonial-author">— Content Manager, Agency</div>
+            </div>
+            <div class="testimonial">
+                <div class="testimonial-text">
+                    "Perfect for our Elementor-based sites. Everything cross-posts beautifully without any manual intervention."
+                </div>
+                <div class="testimonial-author">— Web Designer, Freelance</div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section class="faq">
+            <h2>Frequently Asked Questions</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">Do I need coding skills to use Guest Posts?</div>
+                <div class="faq-answer">No! Guest Posts is designed for non-technical users. The setup process is straightforward, and the plugin provides clear step-by-step instructions.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">How does keyword filtering work?</div>
+                <div class="faq-answer">Each site in your network can set keywords. When a post is published, it checks if the post title, content, tags, or categories match any of the keywords. If there's a match (OR logic), the post is published. If no keywords are set, all posts are accepted.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">Is Guest Posts compatible with Elementor?</div>
+                <div class="faq-answer">Yes! Guest Posts has full Elementor support. Your Elementor-designed pages and posts will cross-post perfectly, preserving all styling and widgets.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">What happens when I update a post?</div>
+                <div class="faq-answer">When you update a published post, Guest Posts automatically syncs the changes to all connected sites where the post was previously published.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">How secure is the API key system?</div>
+                <div class="faq-answer">API keys are encrypted using WordPress's secure encryption methods. Your network connections are protected with industry-standard security practices.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">Can I use Guest Posts with unlimited sites?</div>
+                <div class="faq-answer">Yes! There are no limits on the number of sites you can connect. Add as many WordPress sites to your network as you need.</div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <h2>Ready to Streamline Your Content Distribution?</h2>
+            <p>Join users who are saving time and expanding their reach with Guest Posts</p>
+            <a href="https://wordpress.org/plugins/guest-posts" class="cta-button" target="_blank" style="background: #ff6b6b;">Download Free Plugin</a>
+        </section>
+
+        <!-- Footer Note -->
+        <div style="text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid #ddd; color: #777;">
+            <p>Made with ❤️ by Talking Heads | <a href="https://talkingheads.com" style="color: #667eea;">talkingheads.com</a></p>
+        </div>
+    </div>
+</body>
+</html>
+
